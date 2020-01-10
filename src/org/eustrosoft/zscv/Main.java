@@ -1,4 +1,4 @@
-package com.company;
+package org.eustrosoft.zscv;
 
 import java.io.IOException;
 

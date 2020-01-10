@@ -6,7 +6,7 @@
 //
 //
 
-package com.company;
+package org.eustrosoft.zscv;
 
 import java.util.Vector;
 

@@ -6,7 +6,7 @@
 //
 //
 
-package com.company;
+package org.eustrosoft.zscv;
 
 /**
  * exception which this package able to throw.

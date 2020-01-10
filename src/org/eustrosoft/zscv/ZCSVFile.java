@@ -1,4 +1,4 @@
-package com.company;// EustroSoft.org PSPN/CSV project
+package org.eustrosoft.zscv;// EustroSoft.org PSPN/CSV project
 //
 // (c) Alex V Eustrop & EustroSoft.org 2020
 // 
@@ -6,19 +6,13 @@ package com.company;// EustroSoft.org PSPN/CSV project
 //
 //
 
-import javax.management.Attribute;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.nio.file.attribute.FileAttribute;
-import java.nio.file.attribute.FileAttributeView;
-import java.nio.file.attribute.PosixFileAttributes;
-import java.text.AttributedString;
 import java.util.ArrayList;
-import java.util.Collection;
 
 /**
  * work with File as CSV database
