@@ -17,50 +17,70 @@ import java.util.ArrayList;
 /**
  * work with File as CSV database
  */
-public class ZCSVFile {
+public class ZCSVFile{
 
-    private final String [] MODES_TO_FILE_ACCESS = {"r","rw","rws","rwd"};
+    private final static String [] MODES_TO_FILE_ACCESS = {"r","rw","rws","rwd"};
     private final static String NEXT_LINE_SYMBOL = "\n\r";
     private final static String FILE_EXTENSION = ".csv";
 
+    private static FileChannel channel;
+
     private Path rootPath;
-    private String source_file_name = null;
-    private ArrayList col_rows = new ArrayList();
+    private String sourceFileName = null;
+    private ArrayList<ZCSVRow> fileRows = new ArrayList<>();
+
+    // Experimental
+    public void setArrayList(ArrayList<ZCSVRow> row){
+        fileRows = row;
+    }
+    //
 
     public void setRootPath(String rootPath) {
-        this.rootPath = Paths.get(rootPath+"/");
+        this.rootPath = Paths.get(rootPath+"\\");
     }
 
     public void setFileName(String fileName) {
-        source_file_name = fileName + FILE_EXTENSION;
+        sourceFileName = fileName + FILE_EXTENSION;
     }
 
     public String getFileName() {
-        return source_file_name;
+        return sourceFileName;
     }
 
     // actions on file
-    //open file for read (or write, or append, or lock)
-    public FileChannel open(int mode) throws IOException {
-        RandomAccessFile raf = new RandomAccessFile(rootPath + source_file_name, MODES_TO_FILE_ACCESS[mode]);
-        FileChannel channel = raf.getChannel();
-        return channel;
+    // open file for read (or write, or append, or lock)
+    public FileChannel openFile(int mode) throws IOException {
+        if(channel == null) {
+            try {
+                if (mode > MODES_TO_FILE_ACCESS.length - 1 || mode < 0)
+                    throw new ZCSVException();
+                RandomAccessFile raf = new RandomAccessFile(rootPath + sourceFileName, MODES_TO_FILE_ACCESS[mode]);
+                channel = raf.getChannel();
+                return channel;
+            } catch (ZCSVException ex) {
+                ex.WriteError("Exception in mode selecting part");
+            }
+        }
+        return null;
     }
 
     // close file and free it for others
-    public boolean close(FileChannel targetChannel) throws IOException {
-        if(targetChannel.isOpen())
-            targetChannel.close();
-        else
-            return false;
-        return true;
+    public boolean closeFile() throws IOException {
+        if(channel != null) {
+            if (channel.isOpen()) {
+                channel.close();
+                channel = null;
+                return true;
+            }
+        }
+        return false;
     }
 
     // exclusively lock file (can be used before update)
-    public boolean isLock(FileChannel targetChannel) throws IOException {
+    public boolean isFileLock() throws IOException {
         FileLock lock;
         try {
-            lock = targetChannel.lock(0, targetChannel.size(), false);
+            lock = channel.lock(0, channel.size(), false);
         }catch (IOException ex){
             return true;
         }
@@ -69,12 +89,10 @@ public class ZCSVFile {
 
     //actions on file content
     // load all lines from file & parse valid rows
-    public int load(FileChannel targetChannel) throws IOException {
+    public int loadFromFile() throws IOException {
         try {
-            FileChannel chan = targetChannel;
             ByteBuffer buffer = ByteBuffer.allocate(1024);
-            chan.read(buffer);
-
+            channel.read(buffer);
             System.out.println(new String(buffer.array(), StandardCharsets.UTF_8));
         }catch(IOException ex){
             return 0;
@@ -83,9 +101,11 @@ public class ZCSVFile {
     }
 
     //reload data from file if changed
-    public int reload(FileChannel targetChannel) {
+    public int reloadFromFile() {
         try {
-            targetChannel.force(true);
+            ByteBuffer buffer = ByteBuffer.allocate(1024);
+            channel.force(true);
+            channel.read(buffer);
             return 1;
         }catch (IOException ex){
             return  0;
@@ -93,17 +113,17 @@ public class ZCSVFile {
     }
 
     // update file content based on changes done on rows
-    public int update(FileChannel targetChannel) throws IOException {
-        targetChannel.force(true);
+    public int updateFromChannel() throws IOException {
+        channel.force(true);
         return 1;
     }
 
     // fully rewrite content of file with in-memory data
-    public int rewrite() {
+    public int rewriteFile() {
         try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(rootPath + source_file_name));
-            for(int i = 0;i < col_rows.size();i++){
-                writer.write(col_rows.get(i).toString() + NEXT_LINE_SYMBOL);
+            BufferedWriter writer = new BufferedWriter(new FileWriter(rootPath + sourceFileName));
+            for(int i = 0;i < fileRows.size();i++){
+                writer.write(fileRows.get(i).toString() + NEXT_LINE_SYMBOL);
             }
         }catch (IOException ex){
             return 0;
@@ -112,11 +132,16 @@ public class ZCSVFile {
     }
 
     // the same as as above but new file only
-    public int writeNew(String newFileName) throws IOException {
+    public int writeNewFile(String newFileName) throws IOException {
         try {
-            String fullPath = rootPath + newFileName + ".csv";
-            Path path = Path.of(fullPath);
+            String fullPath = rootPath + newFileName + FILE_EXTENSION;
+            Path path = Paths.get(fullPath);
             Files.createFile(path);
+
+            BufferedWriter writer = new BufferedWriter(new FileWriter(fullPath));
+            for(int i = 0;i < fileRows.size();i++){
+                writer.write(fileRows.get(i).get(i).toString() + NEXT_LINE_SYMBOL);
+            }
         } catch (IOException ex) {
             return 0;
         }
@@ -124,11 +149,11 @@ public class ZCSVFile {
     }
 
     // write changes to file but do not touch any existing data (it's paranodal-safe version of update() method)
-    public boolean append(String stringToWrite) {
+    public boolean appendAndGoToNextLine(String stringToWrite) {
         try {
             BufferedWriter writer = new BufferedWriter
                     (new OutputStreamWriter
-                            (new FileOutputStream(rootPath + source_file_name, true), StandardCharsets.UTF_8));
+                            (new FileOutputStream(rootPath + sourceFileName, true), StandardCharsets.UTF_8));
             try (BufferedWriter out = writer) {
                 out.write(stringToWrite + "\n");
                 out.flush();
@@ -141,9 +166,9 @@ public class ZCSVFile {
     }
 
     // get line from loaded file by number (as is, text upto \n)
-    public String getLine(int i) throws IOException {
+    public String getLineByIndex(int i) throws IOException {
         String stringToGet;
-        BufferedReader reader = new BufferedReader(new FileReader(rootPath + source_file_name));
+        BufferedReader reader = new BufferedReader(new FileReader(rootPath + sourceFileName));
         i--;
         while ((stringToGet = reader.readLine()) != null) {
             if (i < 0) {
@@ -158,12 +183,12 @@ public class ZCSVFile {
     }
 
     // get read-only row from loaded file by number (only proper rows, not commented lines)
-    public ZCSVRow getRow(int i) {
+    public ZCSVRow getRowObjectByIndex(int i) {
         return new ZCSVRow().getNames();
     }
 
     // the same as above but ready for update, change it and use update() method of parent ZCSVFile
-    public ZCSVRow editRow(int i) {
+    public ZCSVRow editRowObjectByIndex(int i) {
         return new ZCSVRow();
     }
 
