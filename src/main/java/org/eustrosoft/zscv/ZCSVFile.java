@@ -6,6 +6,8 @@ package org.eustrosoft.zscv;// EustroSoft.org PSPN/CSV project
 //
 //
 
+import org.apache.logging.log4j.core.appender.routing.Route;
+
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -20,23 +22,25 @@ import java.util.ArrayList;
 public class ZCSVFile{
 
     private final static String [] MODES_TO_FILE_ACCESS = {"r","rw","rws","rwd"};
-    private final static String NEXT_LINE_SYMBOL = "\n\r";
+    private final static String NEXT_LINE_SYMBOL = "\n";
     private final static String FILE_EXTENSION = ".csv";
 
     private static FileChannel channel;
 
-    private Path rootPath;
+    private String rootPath;
     private String sourceFileName = null;
-    private ArrayList<ZCSVRow> fileRows = new ArrayList<>();
+    private ArrayList fileRows = new ArrayList();
 
     // Experimental
-    public void setArrayList(ArrayList<ZCSVRow> row){
-        fileRows = row;
+    public void printArrayList(){
+        for(Object c : fileRows){
+            System.out.println(c);
+        }
     }
     //
 
     public void setRootPath(String rootPath) {
-        this.rootPath = Paths.get(rootPath+"\\");
+        this.rootPath = rootPath + "\\";
     }
 
     public void setFileName(String fileName) {
@@ -49,19 +53,22 @@ public class ZCSVFile{
 
     // actions on file
     // open file for read (or write, or append, or lock)
-    public FileChannel openFile(int mode) throws IOException {
+    // ALL FILE STRINGS NOW DOWNLOADED TO THE ARRAY LIST AND CHANNEL OPENED
+    public void openFile(int mode) throws IOException {
         if(channel == null) {
             try {
                 if (mode > MODES_TO_FILE_ACCESS.length - 1 || mode < 0)
                     throw new ZCSVException();
                 RandomAccessFile raf = new RandomAccessFile(rootPath + sourceFileName, MODES_TO_FILE_ACCESS[mode]);
                 channel = raf.getChannel();
-                return channel;
-            } catch (ZCSVException ex) {
-                ex.WriteError("Exception in mode selecting part");
+
+                System.out.println("Channel opened!");
+            } catch (Exception ex) {
+                ex.printStackTrace();
             }
+        }else{
+            System.out.println("Close channel firstly!");
         }
-        return null;
     }
 
     // close file and free it for others
@@ -70,17 +77,28 @@ public class ZCSVFile{
             if (channel.isOpen()) {
                 channel.close();
                 channel = null;
+
+                System.out.println("Channel closed successfully!");
+
                 return true;
             }
         }
+
+        System.out.println("Channel doesn't closed!");
+
         return false;
     }
 
     // exclusively lock file (can be used before update)
     public boolean isFileLock() throws IOException {
         FileLock lock;
+        if(channel == null) {
+            System.out.println("Channel doesn't defined!");
+            return false;
+        }
         try {
             lock = channel.lock(0, channel.size(), false);
+            System.out.println("Channel locked!");
         }catch (IOException ex){
             return true;
         }
@@ -93,21 +111,33 @@ public class ZCSVFile{
         try {
             ByteBuffer buffer = ByteBuffer.allocate(1024);
             channel.read(buffer);
-            System.out.println(new String(buffer.array(), StandardCharsets.UTF_8));
-        }catch(IOException ex){
+
+            byte [] bytes = buffer.array();
+            String f = new String(bytes, StandardCharsets.UTF_8);
+
+            for(String s : f.trim().split(NEXT_LINE_SYMBOL)){
+                if((s == null || "".equals(s)) && s.startsWith("#"))
+                    continue;
+                else
+                    fileRows.add(new ZCSVRow(s));
+            }
+
+            System.out.println("Array filled by each string!");
+            return 1;
+        }catch(IOException | NullPointerException ex){
+            System.out.println("Array does not filled!");
             return 0;
         }
-        return 1;
     }
 
     //reload data from file if changed
     public int reloadFromFile() {
         try {
-            ByteBuffer buffer = ByteBuffer.allocate(1024);
             channel.force(true);
-            channel.read(buffer);
+            System.out.println("Reloaded from file!");
             return 1;
         }catch (IOException ex){
+            System.out.println("Doesn't reloaded!");
             return  0;
         }
     }
@@ -133,15 +163,19 @@ public class ZCSVFile{
 
     // the same as as above but new file only
     public int writeNewFile(String newFileName) throws IOException {
+        ZCSVRow row;
+        String fullPath = rootPath + newFileName + FILE_EXTENSION;
         try {
-            String fullPath = rootPath + newFileName + FILE_EXTENSION;
             Path path = Paths.get(fullPath);
             Files.createFile(path);
 
             BufferedWriter writer = new BufferedWriter(new FileWriter(fullPath));
-            for(int i = 0;i < fileRows.size();i++){
-                writer.write(fileRows.get(i).get(i).toString() + NEXT_LINE_SYMBOL);
+            for (int i = 0; i < fileRows.size(); i++) {
+                row = (ZCSVRow) fileRows.get(i);
+                writer.write(row.toString() + NEXT_LINE_SYMBOL);
             }
+        }catch (ClassCastException ex){
+
         } catch (IOException ex) {
             return 0;
         }
@@ -191,6 +225,8 @@ public class ZCSVFile{
     public ZCSVRow editRowObjectByIndex(int i) {
         return new ZCSVRow();
     }
+
+
 
     // constructors
     public ZCSVFile() {

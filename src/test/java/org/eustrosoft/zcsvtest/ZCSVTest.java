@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 
 public class ZCSVTest {
-
+/*
     private final static String pathToDirectoryWithTests =
             "E:\\AllProjects\\Java_projects\\Sources\\Java_product_projects\\zcsv\\src\\test\\javaCSVtests";
     ///
