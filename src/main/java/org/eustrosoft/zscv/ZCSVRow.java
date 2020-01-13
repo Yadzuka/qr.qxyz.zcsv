@@ -128,6 +128,8 @@ public class ZCSVRow {
     }
 
     private void splitString(String str){
+        dataInRow = new Vector();
+
         for(String s : str.trim().split(DELIMETER)){
             dataInRow.add(s.trim());
         }

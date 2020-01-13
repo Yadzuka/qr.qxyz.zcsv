@@ -25,9 +25,9 @@ public class ZCSVFile{
     private final static String NEXT_LINE_SYMBOL = "\n";
     private final static String FILE_EXTENSION = ".csv";
 
-    private static FileChannel channel;
+    private static FileChannel channel = null;
 
-    private String rootPath;
+    private String rootPath = null;
     private String sourceFileName = null;
     private ArrayList fileRows = new ArrayList();
 
@@ -73,21 +73,19 @@ public class ZCSVFile{
                 return true;
             }
         }
-
         System.out.println("Channel doesn't closed!");
-
         return false;
     }
 
     // exclusively lock file (can be used before update)
-    public boolean isFileLock() throws IOException {
+    public boolean tryFileLock() throws IOException {
         FileLock lock;
         if(channel == null) {
             System.out.println("Channel doesn't defined!");
             return false;
         }
         try {
-            lock = channel.lock(0, channel.size(), false);
+            lock = channel.tryLock(0, channel.size(), false);
             System.out.println("Channel locked!");
         }catch (IOException ex){
             return true;
@@ -99,7 +97,7 @@ public class ZCSVFile{
     // load all lines from file & parse valid rows
     public int loadFromFile() throws IOException {
         try {
-            ByteBuffer buffer = ByteBuffer.allocate(1024);
+            ByteBuffer buffer = ByteBuffer.allocate((int)channel.size());
             channel.read(buffer);
 
             byte [] bytes = buffer.array();
@@ -116,7 +114,7 @@ public class ZCSVFile{
             return 1;
         }catch(IOException | NullPointerException ex){
             System.out.println("Array does not filled!");
-            return 0;
+            return -1;
         }
     }
 
@@ -159,15 +157,17 @@ public class ZCSVFile{
             Path path = Paths.get(fullPath);
             Files.createFile(path);
 
+            System.out.println("File created!");
             BufferedWriter writer = new BufferedWriter(new FileWriter(fullPath));
             for (int i = 0; i < fileRows.size(); i++) {
                 row = (ZCSVRow) fileRows.get(i);
                 writer.write(row.toString() + NEXT_LINE_SYMBOL);
             }
-        }catch (ClassCastException ex){
-
-        } catch (IOException ex) {
-            return 0;
+            writer.flush();
+            writer.close();
+            System.out.println("Data printed!");
+        }catch (ClassCastException | IOException ex){
+            ex.printStackTrace();
         }
         return 1;
     }

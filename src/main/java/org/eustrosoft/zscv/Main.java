@@ -18,14 +18,7 @@ public class Main {
             if(!file.closeFile()){
                 file.openFile(2);
                 file.loadFromFile();
-                file.printArrayList();
-
-                Scanner in = new Scanner(System.in);
-                String s = in.nextLine();
-                if("ss".equals(s)) {
-                    file.reloadFromFile();
-                }
-                file.printArrayList();
+                file.writeNewFile("Hello");
                 file.closeFile();
             }
         }catch (Exception ex){
