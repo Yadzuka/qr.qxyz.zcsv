@@ -31,17 +31,7 @@ public class ZCSVFile{
     private String sourceFileName = null;
     private ArrayList fileRows = new ArrayList();
 
-    // Experimental
-    public void printArrayList(){
-        for(Object c : fileRows){
-            System.out.println(c);
-        }
-    }
-    //
-
-    public void setRootPath(String rootPath) {
-        this.rootPath = rootPath + "\\";
-    }
+    public void setRootPath(String rootPath) { this.rootPath = rootPath + "\\"; }
 
     public void setFileName(String fileName) {
         sourceFileName = fileName + FILE_EXTENSION;
@@ -58,16 +48,16 @@ public class ZCSVFile{
         if(channel == null) {
             try {
                 if (mode > MODES_TO_FILE_ACCESS.length - 1 || mode < 0)
-                    throw new ZCSVException();
+                    throw new ZCSVException("Неприавльно указан мод работы с файлом!");
                 RandomAccessFile raf = new RandomAccessFile(rootPath + sourceFileName, MODES_TO_FILE_ACCESS[mode]);
                 channel = raf.getChannel();
 
                 System.out.println("Channel opened!");
-            } catch (Exception ex) {
-                ex.printStackTrace();
+            } catch (ZCSVException ex) {
+                ex.printError();
             }
         }else{
-            System.out.println("Close channel firstly!");
+            System.out.println("Channel already opened!");
         }
     }
 
