@@ -221,7 +221,7 @@ public class ZCSVFile {
         }finally{
             try {
                 if(writer != null) writer.close();
-                if(lock != null) lock.release();
+                if(lock != null) {lock.release(); lock = null;}
             }catch (IOException ex){
                 System.err.println(ex);
             }
