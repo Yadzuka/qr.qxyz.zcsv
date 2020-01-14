@@ -14,9 +14,7 @@ package org.eustrosoft.zscv;
 public class ZCSVException extends Exception {
 
     // constructors
-    public ZCSVException() {
-
-    }
+    public ZCSVException() { }
 
     ZCSVException(Exception e) {
         super(e.getMessage());
@@ -25,7 +23,6 @@ public class ZCSVException extends Exception {
     public ZCSVException(String s) {
         super(s);
     }
-
     //  debugging variant
     void printError(){
         super.getMessage();

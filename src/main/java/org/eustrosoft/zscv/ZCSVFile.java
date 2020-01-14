@@ -40,18 +40,16 @@ public class ZCSVFile {
     public void setRootPath(String rootPath) {
         this.rootPath = rootPath + "\\";
     }
-
     public void setFileName(String fileName) {
         sourceFileName = fileName + FILE_EXTENSION;
     }
-
     public String getFileName() {
         return sourceFileName;
     }
-
     // actions on file
     // open file for read (or write, or append, or lock)
     // ALL FILE STRINGS NOW DOWNLOADED TO THE ARRAY LIST AND CHANNEL OPENED
+    // IT WORKS! (in my opinion)
     public boolean tryOpenFile(int mode) throws IOException {
         if (Files.exists(Paths.get(configureFilePath))) {
             try {
@@ -79,25 +77,23 @@ public class ZCSVFile {
         }
         return false;
     }
-
     // close file and free it for others
+    // IT WORKS!
     public boolean closeFile() throws IOException {
         if (channel != null) {
             if (channel.isOpen()) {
                 channel.close();
                 channel = null;
-
                 System.out.println("Channel closed successfully!");
-
                 return true;
             }
         }
         System.out.println("Channel doesn't closed!");
         return false;
     }
-
     // exclusively lock file (can be used before update)
-    private boolean tryFileLock() throws IOException {
+    // IT WORKS!
+    private boolean tryFileLock() {
         if (channel == null) {
             System.out.println("Channel doesn't defined!");
             return false;
@@ -114,9 +110,9 @@ public class ZCSVFile {
             return false;
         }
     }
-
     //actions on file content
     // load all lines from file & parse valid rows
+    // IT WORKS!
     public int loadFromFile() throws IOException {
         try {
             ByteBuffer buffer = ByteBuffer.allocate((int) channel.size());
@@ -131,7 +127,6 @@ public class ZCSVFile {
                 else
                     fileRows.add(new ZCSVRow(s));
             }
-
             System.out.println("Array filled by each string!");
             return 1;
         } catch (IOException | NullPointerException ex) {
@@ -139,39 +134,52 @@ public class ZCSVFile {
             return -1;
         }
     }
-
     //reload data from file if changed
     public int reloadFromFile() {
+        channel.force(true);
+        return 1;
+    }
+    // update file content based on changes done on rows
+    public int updateFromChannel() throws IOException {
         try {
-            channel.force(true);
+            for(int i = 0;i < fileRows.size(); i++){
+                System.out.println(fileRows.get(i).toString());
+                ZCSVRow row = (ZCSVRow) fileRows.get(i);
+                if(row.isDirty()){
+                    fileRows.set(i, row.toString());
+                }
+            }
             System.out.println("Reloaded from file!");
             return 1;
-        } catch (IOException ex) {
+        } catch (ClassCastException ex) {
             System.out.println("Doesn't reloaded!");
             return 0;
         }
     }
-
-    // update file content based on changes done on rows
-    public int updateFromChannel() throws IOException {
-        channel.force(true);
-        return 1;
-    }
-
     // fully rewrite content of file with in-memory data
+    // IT WORKS!
     public int rewriteFile() {
+        BufferedWriter writer = null;
         try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(rootPath + sourceFileName));
+            writer = new BufferedWriter(new FileWriter(rootPath + sourceFileName));
             for (int i = 0; i < fileRows.size(); i++) {
-                writer.write(fileRows.get(i).toString() + NEXT_LINE_SYMBOL);
+                ZCSVRow row = (ZCSVRow) fileRows.get(i);
+                writer.write(row.toString() + NEXT_LINE_SYMBOL);
             }
+            writer.flush();
         } catch (IOException ex) {
             return 0;
+        }finally{
+            try{
+                if(writer != null) writer.close();
+            }catch(IOException ex){
+                ex.printStackTrace();
+            }
         }
         return 1;
     }
-
     // the same as as above but new file only
+    // IT WORKS!
     public int writeNewFile(String newFileName) throws IOException {
         ZCSVRow row;
         String fullPath = rootPath + newFileName + FILE_EXTENSION;
@@ -199,8 +207,8 @@ public class ZCSVFile {
         }
         return 1;
     }
-
     // write changes to file but do not touch any existing data (it's paranodal-safe version of update() method)
+    // IT WORKS!
     public boolean appendAndGoToNextLine(String stringToWrite) {
         BufferedWriter writer = null;
         try {
@@ -228,12 +236,11 @@ public class ZCSVFile {
         }
         return true;
     }
-
     // get line from loaded file by number (as is, text upto \n)
+    // IT WORKS!
     public String getLineByIndex(int i) throws IOException {
         String stringToGet;
         BufferedReader reader = new BufferedReader(new FileReader(rootPath + sourceFileName));
-        i--;
         while ((stringToGet = reader.readLine()) != null) {
             if (i < 0) {
                 return "Not valid value";
@@ -245,21 +252,30 @@ public class ZCSVFile {
         }
         return "This string does not existing";
     }
-
     // get read-only row from loaded file by number (only proper rows, not commented lines)
     public ZCSVRow getRowObjectByIndex(int i) {
-        return new ZCSVRow().getNames();
+        return (ZCSVRow) fileRows.get(i);
     }
-
     // the same as above but ready for update, change it and use update() method of parent ZCSVFile
     public ZCSVRow editRowObjectByIndex(int i) {
-        return new ZCSVRow();
+        try {
+            if (tryFileLock()) {
+                ZCSVRow newRow = (ZCSVRow) fileRows.get(i);
+                return (ZCSVRow) fileRows.get(i);
+            }
+        }catch (Exception ex){
+            System.err.println(ex);
+        }finally{
+            try {
+                if(lock != null) {lock.release(); lock = null;}
+            }catch (IOException ex){
+                System.err.println(ex);
+            }
+        }
+        return (null);
     }
-
-
     // constructors
     public ZCSVFile() {
 
     }
-
 } //ZCSVFile

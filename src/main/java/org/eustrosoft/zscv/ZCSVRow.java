@@ -30,7 +30,7 @@ public class ZCSVRow {
             if (is_row) return null;
             is_dirty = true;
             if (dataInRow == null) dataInRow = new Vector(i + 1);
-            if (i < dataInRow.size()) return (null);
+            if (i >= dataInRow.size()) return (null);
 
             dataInRow.set(i, str);
             String ov = (String) dataInRow.get(i);
@@ -40,7 +40,6 @@ public class ZCSVRow {
         }
         return null;
     }
-
     public String setNewName(String name, String dataInRow) {
         try {
             int index = name2column(name);
@@ -53,7 +52,6 @@ public class ZCSVRow {
         }
         return null;
     }
-
     public String get(int i) {
         try {
             if (dataInRow == null)
@@ -66,11 +64,9 @@ public class ZCSVRow {
         }
         return null;
     }
-
     public String get(String name) {
         return get(name2column(name));
     }
-
     public int name2column(String name) {
         try {
             if (nameMap != null && name != null) {
@@ -86,31 +82,27 @@ public class ZCSVRow {
         }
         return -1;
     }
-
+    public boolean isDirty(){
+        return is_dirty;
+    }
     public void setRow() {
         is_row = true;
     }
-
     public boolean isRow() {
         return (is_row);
     }
-
     public void setPrevious(ZCSVRow previous) {
         previousRow = previous;
     }
-
     public ZCSVRow getPrevious() {
         return (previousRow);
     }
-
     public void setNames(String[] names) {
         nameMap = names;
     }
-
     public ZCSVRow getNames() {
         return this;
     }
-
     @Override
     public String toString() {
         StringBuilder returnString = new StringBuilder();
@@ -123,10 +115,8 @@ public class ZCSVRow {
                 returnString.append(dataInRow.get(i).toString());
             }
         }
-
         return returnString.toString();
     }
-
     private void splitString(String str){
         dataInRow = new Vector();
 
@@ -134,24 +124,19 @@ public class ZCSVRow {
             dataInRow.add(s.trim());
         }
     }
-
     // constructors
     public ZCSVRow() {
     }
-
     public ZCSVRow(String row) {
         splitString(row);
     }
-
     public ZCSVRow(String row, String delimiter) {
         DELIMETER = delimiter;
         splitString(row);
     }
-
     public ZCSVRow(String[] values) {
         setNames(values);
     }
-
     public ZCSVRow(String[] values, String[] names) {
         setNames(values);
         for(String s : names){
