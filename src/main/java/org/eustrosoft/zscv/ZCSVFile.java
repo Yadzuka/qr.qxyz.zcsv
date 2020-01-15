@@ -1,7 +1,7 @@
 package org.eustrosoft.zscv;// EustroSoft.org PSPN/CSV project
 //
-// (c) Alex V Eustrop & EustroSoft.org 2020
-// 
+// (c) Alex V Eustrop & yadzuka & EustroSoft.org 2020
+//
 // LICENSE: BALES, ISC, MIT, BSD on your choice
 //
 //
@@ -15,6 +15,7 @@ import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.ArrayList;
+import java.util.stream.Stream;
 
 /**
  * work with File as CSV database
@@ -25,8 +26,9 @@ public class ZCSVFile {
     private final static String NEXT_LINE_SYMBOL = "\n";
     private final static String FILE_EXTENSION = ".csv";
 
-    private FileLock lock;
-    private static FileChannel channel = null;
+    private static FileLock lock;
+    private FileChannel channel = null;
+    private ByteBuffer buffer;
 
     private String configureFilePath;
     private String rootPath = null;
@@ -38,10 +40,10 @@ public class ZCSVFile {
     }
 
     public void setRootPath(String rootPath) {
-        this.rootPath = rootPath + "\\";
+        this.rootPath = rootPath + "/";
     }
     public void setFileName(String fileName) {
-        sourceFileName = fileName + FILE_EXTENSION;
+        sourceFileName = fileName;
     }
     public String getFileName() {
         return sourceFileName;
@@ -57,7 +59,12 @@ public class ZCSVFile {
                     if (mode > MODES_TO_FILE_ACCESS.length - 1 || mode < 0) {
                         throw new ZCSVException("Неприавльно указан мод работы с файлом!");
                     }
-                    RandomAccessFile raf = new RandomAccessFile(rootPath + sourceFileName, MODES_TO_FILE_ACCESS[mode]);
+
+                    loadFromFile();
+
+                    writeNewFile(sourceFileName + "Timed");
+
+                    RandomAccessFile raf = new RandomAccessFile(rootPath + sourceFileName+"Timed"+ FILE_EXTENSION, MODES_TO_FILE_ACCESS[mode]);
                     channel = raf.getChannel();
 
                     System.out.println("Channel opened!");
@@ -113,30 +120,34 @@ public class ZCSVFile {
     //actions on file content
     // load all lines from file & parse valid rows
     // IT WORKS!
-    public int loadFromFile() throws IOException {
+    private void loadFromFile() throws IOException {
         try {
-            ByteBuffer buffer = ByteBuffer.allocate((int) channel.size());
+            /*buffer = ByteBuffer.allocate((int) channel.size());
             channel.read(buffer);
 
             byte[] bytes = buffer.array();
-            String f = new String(bytes, StandardCharsets.UTF_8);
+            String f = new String(bytes, StandardCharsets.UTF_8);*/
+            BufferedReader reader = new BufferedReader
+                    (new InputStreamReader
+                            (new FileInputStream(rootPath + sourceFileName+ "Timed" + FILE_EXTENSION), StandardCharsets.UTF_8));
 
-            for (String s : f.trim().split(NEXT_LINE_SYMBOL)) {
-                if ((s == null || "".equals(s)) && s.startsWith("#"))
+            String bufForStrings = "";
+            while((bufForStrings = reader.readLine()) != null) {
+                bufForStrings.trim();
+                if ("".equals(bufForStrings) || bufForStrings.startsWith("#"))
                     continue;
                 else
-                    fileRows.add(new ZCSVRow(s));
+                    fileRows.add(new ZCSVRow(bufForStrings));
             }
             System.out.println("Array filled by each string!");
-            return 1;
+
         } catch (IOException | NullPointerException ex) {
             System.out.println("Array does not filled!");
-            return -1;
         }
     }
     //reload data from file if changed
     public int reloadFromFile() {
-        channel.force(true);
+       // channel.force(true);
         return 1;
     }
     // update file content based on changes done on rows
@@ -161,7 +172,7 @@ public class ZCSVFile {
     public int rewriteFile() {
         BufferedWriter writer = null;
         try {
-            writer = new BufferedWriter(new FileWriter(rootPath + sourceFileName));
+            writer = new BufferedWriter(new FileWriter(rootPath + sourceFileName + FILE_EXTENSION));
             for (int i = 0; i < fileRows.size(); i++) {
                 ZCSVRow row = (ZCSVRow) fileRows.get(i);
                 writer.write(row.toString() + NEXT_LINE_SYMBOL);
@@ -178,6 +189,7 @@ public class ZCSVFile {
         }
         return 1;
     }
+                    //fileRows.set(i, row.toString());
     // the same as as above but new file only
     // IT WORKS!
     public int writeNewFile(String newFileName) throws IOException {
@@ -215,7 +227,7 @@ public class ZCSVFile {
             if(tryFileLock()) {
                 writer = new BufferedWriter
                         (new OutputStreamWriter
-                                (new FileOutputStream(rootPath + sourceFileName, true), StandardCharsets.UTF_8));
+                                (new FileOutputStream(rootPath + sourceFileName + FILE_EXTENSION, true), StandardCharsets.UTF_8));
                 try (BufferedWriter out = writer) {
                     out.write(stringToWrite + "\n");
                     out.flush();
@@ -240,7 +252,7 @@ public class ZCSVFile {
     // IT WORKS!
     public String getLineByIndex(int i) throws IOException {
         String stringToGet;
-        BufferedReader reader = new BufferedReader(new FileReader(rootPath + sourceFileName));
+        BufferedReader reader = new BufferedReader(new FileReader(rootPath + sourceFileName + FILE_EXTENSION));
         while ((stringToGet = reader.readLine()) != null) {
             if (i < 0) {
                 return "Not valid value";
@@ -251,6 +263,61 @@ public class ZCSVFile {
             }
         }
         return "This string does not existing";
+    }
+
+    public void rewriteLineInFile() throws IOException{
+        try {
+            String []firstFileMassiveOfStrings = new String[fileRows.size()];
+            int countOfDirtyStrings = 0;
+            for(int i = 0;i < fileRows.size(); i++){
+                ZCSVRow row = (ZCSVRow) fileRows.get(i);
+                firstFileMassiveOfStrings[i] = row.toString();
+                if(row.isDirty()){
+                    countOfDirtyStrings++;
+                    
+                }
+
+            }
+            if(countOfDirtyStrings == 0)
+                return;
+
+            RandomAccessFile raf2 = new RandomAccessFile(rootPath + sourceFileName +
+                                                        "Timed" + FILE_EXTENSION, MODES_TO_FILE_ACCESS[0]);
+            FileChannel secondChannel = raf2.getChannel();
+            ByteBuffer secondBuffer = ByteBuffer.allocate((int)secondChannel.size());
+            secondChannel.read(secondBuffer);
+
+            String stringForSecondV = new String(secondBuffer.array(), StandardCharsets.UTF_8);
+            String [] secondFileMassiveOfStrings = stringForSecondV.trim().split(NEXT_LINE_SYMBOL);
+            int countOfString = stringForSecondV.trim().split(NEXT_LINE_SYMBOL).length;
+            for(int i = 0; i <  countOfString; i++){
+                if(secondFileMassiveOfStrings[i].equals(firstFileMassiveOfStrings[i])){
+                    continue;
+                }else{
+                    secondFileMassiveOfStrings[i] = firstFileMassiveOfStrings[i];
+                }
+            }
+
+            if(tryFileLock()) {
+                BufferedWriter writer = new BufferedWriter
+                        (new OutputStreamWriter
+                                (new FileOutputStream(rootPath + sourceFileName+ "Timed"
+                                        + FILE_EXTENSION, false), StandardCharsets.UTF_8));
+                for (String str : secondFileMassiveOfStrings) {
+                    writer.write(str + "\n");
+                }
+                writer.flush();
+                writer.close();
+            }
+        } catch (ClassCastException ex) {
+            System.out.println("Doesn't reloaded!");
+        }finally{
+            try{
+                if(lock != null) {lock.release(); lock.close();}
+            }catch (Exception ex){
+                ex.printStackTrace();
+            }
+        }
     }
     // get read-only row from loaded file by number (only proper rows, not commented lines)
     public ZCSVRow getRowObjectByIndex(int i) {

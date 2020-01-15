@@ -14,23 +14,21 @@ public class Main {
         int code;
         boolean success;
         file.setFileName("test");
-        file.setRootPath("E:\\AllProjects\\Java_projects\\Sources\\Java_product_projects\\zcsv\\CSVTestFiles");
-        file.setConfigureFilePath("E:\\AllProjects\\Java_projects" +
-                "\\Sources\\Java_product_projects\\zcsv\\CSVTestFiles\\ConfigurePath\\HelloConfigure.csv");
+        file.setRootPath("/home/yadzuka/workspace/Java_projects/Sources/Java_product_projects/qr.qxyz.zcsv/CSVTestFiles");
+        file.setConfigureFilePath("/home/yadzuka/workspace/Java_projects/Sources/Java_product_projects" +
+                "/qr.qxyz.zcsv/CSVTestFiles/ConfigurePath/HelloConfigure.csv");
         try {
             // IF OPENING MODE = 0 - WE CANT WRITE IN THE FILE. (EXCEPTION HANDLED)
                 if(file.tryOpenFile(1)) {
-                    file.loadFromFile();
-                    String k = file.getLineByIndex(7);
-                    row = file.editRowObjectByIndex(7);
+                    row = file.editRowObjectByIndex(0);
+                    row.setNames(new String[]{"key", "value","ke","valui","newvalui"});
+                    row.setNewName("bye", "hello");
+                    row.setStringSpecificIndex(2, "isn't");
+                    file.rewriteLineInFile();
                     file.closeFile();
-                    System.out.println(k);
-                    System.out.println(row.get(1));
-                    System.out.println(row.setStringSpecificIndex(0,"JJJ"));
-                    file.reloadFromFile();
-                    System.out.println(file.getLineByIndex(7));
+
                 }else
-                    System.out.println("Error with opening");
+                    System.err.println("Error with opening");
 
         }catch (Exception ex){
             ex.printStackTrace();

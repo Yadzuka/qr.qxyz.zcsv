@@ -46,7 +46,7 @@ public class ZCSVRow {
             if (index == -1)
                 throw new ZCSVException("Название параметра не найдено!");
 
-            return setStringSpecificIndex(name2column(name), dataInRow);
+            return setStringSpecificIndex(index, dataInRow);
         }catch (ZCSVException ex) {
             ex.printError();
         }
@@ -67,11 +67,12 @@ public class ZCSVRow {
     public String get(String name) {
         return get(name2column(name));
     }
+
     public int name2column(String name) {
         try {
-            if (nameMap != null && name != null) {
-                for (int i = 0; i < nameMap.length; i++)
-                    if (name.equals(nameMap[i]))
+            if (dataInRow != null && name != null) {
+                for (int i = 0; i < dataInRow.size(); i++)
+                    if (name.equals(dataInRow.get(i)))
                         return (i);
                     else
                         throw new ZCSVException("Искомый параметр не найден!");
