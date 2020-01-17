@@ -28,9 +28,9 @@ public class ZCSVFile {
 
     private static FileLock lock;
     private FileChannel channel = null;
-    private ByteBuffer buffer;
+    private ByteBuffer buffer = null;
 
-    private String configureFilePath;
+    private String configureFilePath = null;
     private String rootPath = null;
     private String sourceFileName = null;
     private ArrayList fileRows = new ArrayList();
@@ -52,7 +52,7 @@ public class ZCSVFile {
     // open file for read (or write, or append, or lock)
     // ALL FILE STRINGS NOW DOWNLOADED TO THE ARRAY LIST AND CHANNEL OPENED
     // IT WORKS! (in my opinion)
-    public boolean tryOpenFile(int mode) throws IOException {
+    public boolean tryOpenFile(int mode) {
         if (Files.exists(Paths.get(configureFilePath))) {
             try {
                 if (channel == null) {
@@ -60,17 +60,11 @@ public class ZCSVFile {
                         throw new ZCSVException("Неприавльно указан мод работы с файлом!");
                     }
 
-                    loadFromFile();
-
-                    writeNewFile(sourceFileName + "Timed");
-
-                    RandomAccessFile raf = new RandomAccessFile(rootPath + sourceFileName+"Timed"+ FILE_EXTENSION, MODES_TO_FILE_ACCESS[mode]);
+                    RandomAccessFile raf = new RandomAccessFile(rootPath + sourceFileName + FILE_EXTENSION, MODES_TO_FILE_ACCESS[mode]);
                     channel = raf.getChannel();
-
-                    System.out.println("Channel opened!");
                     return true;
                 } else {
-                    System.out.println("Channel already opened!");
+                    throw new ZCSVException("Channel already opened!");
                 }
             } catch (FileNotFoundException ex) {
                 ex.printStackTrace();
@@ -79,48 +73,43 @@ public class ZCSVFile {
                 ex.printError();
                 return false;
             }
-        }else {
-            System.out.println("Configure file not find");
         }
         return false;
     }
     // close file and free it for others
-    // IT WORKS!
+    // IT WORKS! (MB)
     public boolean closeFile() throws IOException {
         if (channel != null) {
             if (channel.isOpen()) {
                 channel.close();
                 channel = null;
-                System.out.println("Channel closed successfully!");
                 return true;
             }
         }
-        System.out.println("Channel doesn't closed!");
         return false;
     }
     // exclusively lock file (can be used before update)
     // IT WORKS!
     private boolean tryFileLock() {
         if (channel == null) {
-            System.out.println("Channel doesn't defined!");
             return false;
         }
         try {
             if(lock == null) {
                 lock = channel.tryLock(0, channel.size(), false);
-                System.out.println("Channel locked!");
                 return true;
             }
             else
                 return false;
         } catch (IOException ex) {
+            ex.printStackTrace();
             return false;
         }
     }
     //actions on file content
     // load all lines from file & parse valid rows
     // IT WORKS!
-    private void loadFromFile() throws IOException {
+    public void loadFromFile() {
         try {
             /*buffer = ByteBuffer.allocate((int) channel.size());
             channel.read(buffer);
@@ -129,7 +118,7 @@ public class ZCSVFile {
             String f = new String(bytes, StandardCharsets.UTF_8);*/
             BufferedReader reader = new BufferedReader
                     (new InputStreamReader
-                            (new FileInputStream(rootPath + sourceFileName+ "Timed" + FILE_EXTENSION), StandardCharsets.UTF_8));
+                            (new FileInputStream(rootPath + sourceFileName + FILE_EXTENSION), StandardCharsets.UTF_8));
 
             String bufForStrings = "";
             while((bufForStrings = reader.readLine()) != null) {
@@ -160,19 +149,19 @@ public class ZCSVFile {
                     fileRows.set(i, row.toString());
                 }
             }
-            System.out.println("Reloaded from file!");
             return 1;
         } catch (ClassCastException ex) {
-            System.out.println("Doesn't reloaded!");
             return 0;
         }
     }
     // fully rewrite content of file with in-memory data
     // IT WORKS!
-    public int rewriteFile() {
+    public int rewriteAllFile() {
         BufferedWriter writer = null;
         try {
-            writer = new BufferedWriter(new FileWriter(rootPath + sourceFileName + FILE_EXTENSION));
+            writer = new BufferedWriter
+                    (new OutputStreamWriter(new FileOutputStream
+                            (rootPath + sourceFileName + FILE_EXTENSION, false),StandardCharsets.UTF_8));
             for (int i = 0; i < fileRows.size(); i++) {
                 ZCSVRow row = (ZCSVRow) fileRows.get(i);
                 writer.write(row.toString() + NEXT_LINE_SYMBOL);
@@ -201,10 +190,8 @@ public class ZCSVFile {
                 Files.createFile(path);
             }
             else {
-                System.out.println("File already exists!");
                 return -1;
             }
-            System.out.println("File created!");
             BufferedWriter writer = new BufferedWriter(new FileWriter(fullPath));
             for (int i = 0; i < fileRows.size(); i++) {
                 row = (ZCSVRow) fileRows.get(i);
@@ -212,7 +199,6 @@ public class ZCSVFile {
             }
             writer.flush();
             writer.close();
-            System.out.println("Data printed!");
         } catch (ClassCastException | IOException ex) {
             ex.printStackTrace();
             return -1;
@@ -221,38 +207,29 @@ public class ZCSVFile {
     }
     // write changes to file but do not touch any existing data (it's paranodal-safe version of update() method)
     // IT WORKS!
-    public boolean appendAndGoToNextLine(String stringToWrite) {
-        BufferedWriter writer = null;
-        try {
-            if(tryFileLock()) {
-                writer = new BufferedWriter
-                        (new OutputStreamWriter
-                                (new FileOutputStream(rootPath + sourceFileName + FILE_EXTENSION, true), StandardCharsets.UTF_8));
-                try (BufferedWriter out = writer) {
-                    out.write(stringToWrite + "\n");
-                    out.flush();
-                    fileRows.add(new ZCSVRow(stringToWrite));
+    public void appendNewStringsToFile() throws IOException {
+        if(tryFileLock()) {
+            BufferedWriter writer = new BufferedWriter
+                    (new OutputStreamWriter
+                            (new FileOutputStream(rootPath + sourceFileName
+                                    + FILE_EXTENSION, true), StandardCharsets.UTF_8));
+            for (int i = 0; i < fileRows.size(); i++) {
+                ZCSVRow row = (ZCSVRow) fileRows.get(i);
+                if (row.isDirty()) {
+                    writer.write(row.toString() + NEXT_LINE_SYMBOL);
                 }
-                System.out.println("Line appended!");
             }
-        } catch (IOException e) {
-            System.err.println(e);
-            return false;
-        }finally{
-            try {
-                if(writer != null) writer.close();
-                if(lock != null) {lock.release(); lock = null;}
-            }catch (IOException ex){
-                System.err.println(ex);
-            }
+            writer.flush();
+            writer.close();
         }
-        return true;
     }
     // get line from loaded file by number (as is, text upto \n)
     // IT WORKS!
     public String getLineByIndex(int i) throws IOException {
         String stringToGet;
-        BufferedReader reader = new BufferedReader(new FileReader(rootPath + sourceFileName + FILE_EXTENSION));
+        BufferedReader reader = new BufferedReader
+                (new InputStreamReader
+                        (new FileInputStream(rootPath + sourceFileName + FILE_EXTENSION), StandardCharsets.UTF_8));
         while ((stringToGet = reader.readLine()) != null) {
             if (i < 0) {
                 return "Not valid value";
@@ -265,57 +242,49 @@ public class ZCSVFile {
         return "This string does not existing";
     }
 
-    public void rewriteLineInFile() throws IOException{
+    // fully rewrite file with in memory data
+    public void rewriteFile() throws IOException{
         try {
-            String []firstFileMassiveOfStrings = new String[fileRows.size()];
-            int countOfDirtyStrings = 0;
-            for(int i = 0;i < fileRows.size(); i++){
-                ZCSVRow row = (ZCSVRow) fileRows.get(i);
-                firstFileMassiveOfStrings[i] = row.toString();
-                if(row.isDirty()){
-                    countOfDirtyStrings++;
-                    
+            if(lock == null) {
+                String[] firstFileMassiveOfStrings = new String[fileRows.size()];
+
+                if (tryFileLock()) {
+                    BufferedWriter writer = new BufferedWriter
+                            (new OutputStreamWriter
+                                    (new FileOutputStream(rootPath + sourceFileName
+                                            + FILE_EXTENSION, false), StandardCharsets.UTF_8));
+
+                    for (int i = 0; i < fileRows.size(); i++)
+                        writer.write(fileRows.get(i).toString() + "\n");
+
+                    writer.flush();
+                    writer.close();
                 }
-
+            }else{
+                throw new ZCSVException("File is opened");
             }
-            if(countOfDirtyStrings == 0)
-                return;
-
-            RandomAccessFile raf2 = new RandomAccessFile(rootPath + sourceFileName +
-                                                        "Timed" + FILE_EXTENSION, MODES_TO_FILE_ACCESS[0]);
-            FileChannel secondChannel = raf2.getChannel();
-            ByteBuffer secondBuffer = ByteBuffer.allocate((int)secondChannel.size());
-            secondChannel.read(secondBuffer);
-
-            String stringForSecondV = new String(secondBuffer.array(), StandardCharsets.UTF_8);
-            String [] secondFileMassiveOfStrings = stringForSecondV.trim().split(NEXT_LINE_SYMBOL);
-            int countOfString = stringForSecondV.trim().split(NEXT_LINE_SYMBOL).length;
-            for(int i = 0; i <  countOfString; i++){
-                if(secondFileMassiveOfStrings[i].equals(firstFileMassiveOfStrings[i])){
-                    continue;
-                }else{
-                    secondFileMassiveOfStrings[i] = firstFileMassiveOfStrings[i];
-                }
-            }
-
-            if(tryFileLock()) {
-                BufferedWriter writer = new BufferedWriter
-                        (new OutputStreamWriter
-                                (new FileOutputStream(rootPath + sourceFileName+ "Timed"
-                                        + FILE_EXTENSION, false), StandardCharsets.UTF_8));
-                for (String str : secondFileMassiveOfStrings) {
-                    writer.write(str + "\n");
-                }
-                writer.flush();
-                writer.close();
-            }
-        } catch (ClassCastException ex) {
-            System.out.println("Doesn't reloaded!");
+        } catch (ZCSVException ex) {
+            ex.printError();
         }finally{
             try{
                 if(lock != null) {lock.release(); lock.close();}
             }catch (Exception ex){
                 ex.printStackTrace();
+            }
+        }
+    }
+    private void compireFileAndArray() throws IOException {
+        ByteBuffer secondBuffer = ByteBuffer.allocate((int)channel.size());
+        channel.read(secondBuffer);
+
+        String stringForSecondV = new String(secondBuffer.array(), StandardCharsets.UTF_8);
+        String [] massiveOfFIleStrings = stringForSecondV.trim().split(NEXT_LINE_SYMBOL);
+        int countOfString = stringForSecondV.trim().split(NEXT_LINE_SYMBOL).length;
+        for(int i = 0; i <  countOfString; i++){
+            if(massiveOfFIleStrings[i].equals(fileRows.get(i).toString())){
+                continue;
+            }else{
+
             }
         }
     }

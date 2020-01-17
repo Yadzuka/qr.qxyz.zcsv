@@ -20,11 +20,10 @@ public class Main {
         try {
             // IF OPENING MODE = 0 - WE CANT WRITE IN THE FILE. (EXCEPTION HANDLED)
                 if(file.tryOpenFile(1)) {
-                    row = file.editRowObjectByIndex(0);
-                    row.setNames(new String[]{"key", "value","ke","valui","newvalui"});
-                    row.setNewName("bye", "hello");
-                    row.setStringSpecificIndex(2, "isn't");
-                    file.rewriteLineInFile();
+                    file.loadFromFile();
+                    row = file.getRowObjectByIndex(3);
+                    row.setStringSpecificIndex(0, "HALLOO");
+                    file.appendNewStringsToFile();
                     file.closeFile();
 
                 }else
